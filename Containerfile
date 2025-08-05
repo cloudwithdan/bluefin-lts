@@ -1,6 +1,6 @@
 ARG MAJOR_VERSION="${MAJOR_VERSION:-c10s}"
 ARG BASE_IMAGE_SHA="${BASE_IMAGE_SHA:-sha256-feea845d2e245b5e125181764cfbc26b6dacfb3124f9c8d6a2aaa4a3f91082ed}"
-FROM scratch as context
+FROM scratch AS context
 
 COPY system_files /files
 COPY system_files_overrides /overrides
@@ -17,12 +17,36 @@ ARG IMAGE_VENDOR="${IMAGE_VENDOR:-ublue-os}"
 ARG MAJOR_VERSION="${MAJOR_VERSION:-lts}"
 ARG SHA_HEAD_SHORT="${SHA_HEAD_SHORT:-deadbeef}"
 
+# RUN --mount=type=tmpfs,dst=/opt \
+#   --mount=type=tmpfs,dst=/tmp \
+#   --mount=type=tmpfs,dst=/var \
+#   --mount=type=tmpfs,dst=/boot \
+#   --mount=type=bind,from=context,source=/,target=/run/context \
+#   /run/context/build_scripts/build.sh
+
+# Layer 1: Install Packages
 RUN --mount=type=tmpfs,dst=/opt \
   --mount=type=tmpfs,dst=/tmp \
   --mount=type=tmpfs,dst=/var \
   --mount=type=tmpfs,dst=/boot \
   --mount=type=bind,from=context,source=/,target=/run/context \
-  /run/context/build_scripts/build.sh
+  /run/context/build_scripts/install_packages.sh
+
+# Layer 2: Apply System Overlays & Scripts
+RUN --mount=type=tmpfs,dst=/opt \
+    --mount=type=tmpfs,dst=/tmp \
+    --mount=type=tmpfs,dst=/var \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=bind,from=context,source=/,target=/run/context \
+    /run/context/build_scripts/apply_overlays.sh
+
+# Layer 3: Final Cleanup
+RUN --mount=type=tmpfs,dst=/opt \
+    --mount=type=tmpfs,dst=/tmp \
+    --mount=type=tmpfs,dst=/var \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=bind,from=context,source=/,target=/run/context \
+    /run/context/build_scripts/final_cleanup.sh
 
 # Makes `/opt` writeable by default
 # Needs to be here to make the main image build strict (no /opt there)
